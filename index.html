@@ -1,0 +1,1268 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema SAR + NASA - Volcanes Perú</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 100%);
+            color: white;
+            overflow-x: hidden;
+        }
+        
+        .header {
+            background: rgba(0,0,0,0.3);
+            backdrop-filter: blur(10px);
+            padding: 1rem 2rem;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .header h1 {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1.8rem;
+            background: linear-gradient(45deg, #ff6b35, #00d4ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .nasa-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 15px;
+            background: rgba(0,212,255,0.1);
+            border-radius: 20px;
+            border: 1px solid rgba(0,212,255,0.3);
+        }
+        
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #00ff00;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .container {
+            display: flex;
+            height: calc(100vh - 80px);
+        }
+        
+        .sidebar {
+            width: 380px;
+            background: rgba(0,0,0,0.4);
+            backdrop-filter: blur(10px);
+            border-right: 1px solid rgba(255,255,255,0.1);
+            padding: 20px;
+            overflow-y: auto;
+        }
+        
+        .control-section {
+            margin-bottom: 25px;
+            padding: 20px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .control-section h3 {
+            color: #ff6b35;
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #a0a0a0;
+            font-size: 0.9rem;
+        }
+        
+        select, input[type="range"], input[type="checkbox"], button {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 6px;
+            background: rgba(0,0,0,0.3);
+            color: white;
+            font-size: 0.9rem;
+        }
+        
+        input[type="checkbox"] {
+            width: auto;
+            margin-right: 8px;
+        }
+        
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        select:focus, input:focus {
+            outline: none;
+            border-color: #ff6b35;
+            box-shadow: 0 0 10px rgba(255,107,53,0.3);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(45deg, #ff6b35, #ff8c42);
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            margin-bottom: 10px;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(255,107,53,0.3);
+        }
+        
+        .btn-secondary {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 8px;
+        }
+        
+        .btn-secondary:hover {
+            background: rgba(255,255,255,0.2);
+        }
+        
+        .btn-nasa {
+            background: linear-gradient(45deg, #0066cc, #004499);
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            margin-bottom: 10px;
+        }
+        
+        .btn-nasa:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0,102,204,0.3);
+        }
+        
+        .map-container {
+            flex: 1;
+            position: relative;
+        }
+        
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .alert-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 300px;
+            max-height: 400px;
+            background: rgba(0,0,0,0.8);
+            backdrop-filter: blur(10px);
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.2);
+            z-index: 1000;
+            overflow-y: auto;
+        }
+        
+        .alert-header {
+            padding: 15px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .alert-item {
+            padding: 12px 15px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            transition: background 0.3s ease;
+        }
+        
+        .alert-item:hover {
+            background: rgba(255,255,255,0.05);
+        }
+        
+        .alert-high {
+            border-left: 4px solid #ff4444;
+        }
+        
+        .alert-medium {
+            border-left: 4px solid #ffaa00;
+        }
+        
+        .alert-info {
+            border-left: 4px solid #00d4ff;
+        }
+        
+        .volcano-info {
+            background: rgba(0,0,0,0.05);
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 10px;
+        }
+        
+        .volcano-card {
+            background: linear-gradient(45deg, rgba(255,107,53,0.1), rgba(255,140,66,0.1));
+            border-left: 3px solid #ff6b35;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 0 8px 8px 0;
+        }
+        
+        .volcano-card h4 {
+            color: #ff6b35;
+            margin-bottom: 8px;
+        }
+        
+        .risk-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            margin-top: 8px;
+        }
+        
+        .risk-very-high {
+            background: #ff4444;
+            color: white;
+        }
+        
+        .risk-high {
+            background: #ffaa00;
+            color: black;
+        }
+        
+        .risk-medium {
+            background: #ffdd00;
+            color: black;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin: 15px 0;
+        }
+        
+        .stat-box {
+            background: rgba(0,0,0,0.3);
+            padding: 10px;
+            border-radius: 6px;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #ff6b35;
+        }
+        
+        .stat-label {
+            font-size: 0.8rem;
+            color: #a0a0a0;
+        }
+        
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            border-radius: 10px;
+            z-index: 1001;
+            display: none;
+        }
+        
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(255,255,255,0.3);
+            border-top: 3px solid #ff6b35;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .legend {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(10px);
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.2);
+            z-index: 1000;
+        }
+        
+        .legend h4 {
+            margin-bottom: 10px;
+            color: #ff6b35;
+            font-size: 1rem;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+            font-size: 0.9rem;
+        }
+        
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+            border-radius: 50%;
+            border: 2px solid rgba(255,255,255,0.3);
+        }
+        
+        .leaflet-control-layers {
+            background: rgba(0,0,0,0.8) !important;
+            backdrop-filter: blur(10px) !important;
+            border: 1px solid rgba(255,255,255,0.2) !important;
+            border-radius: 8px !important;
+            color: white !important;
+        }
+        
+        .leaflet-control-layers-base label,
+        .leaflet-control-layers-overlays label {
+            color: white !important;
+            font-size: 0.9rem;
+        }
+        
+        .leaflet-control-scale-line {
+            background: rgba(0,0,0,0.7) !important;
+            border: 1px solid rgba(255,255,255,0.3) !important;
+            color: white !important;
+        }
+        
+        .data-source-indicator {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(10px);
+            padding: 10px 15px;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.2);
+            z-index: 1000;
+            font-size: 0.9rem;
+        }
+        
+        .source-active {
+            color: #00ff00;
+        }
+        
+        .source-inactive {
+            color: #ff6666;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🌋 Sistema SAR + NASA - Volcanes Perú</h1>
+        <div class="nasa-status">
+            <div class="status-indicator"></div>
+            <span>NASA FIRMS Conectado</span>
+        </div>
+    </div>
+    
+    <div class="container">
+        <div class="sidebar">
+            <div class="control-section">
+                <h3>🌋 Monitoreo Volcánico</h3>
+                <div class="form-group">
+                    <label>Volcanes por Riesgo</label>
+                    <select id="riskFilter">
+                        <option value="all">Todos los volcanes</option>
+                        <option value="very-high">Riesgo Muy Alto</option>
+                        <option value="high">Riesgo Alto</option>
+                        <option value="medium">Riesgo Medio</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Fuentes de Datos</label>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="enableSAR" checked>
+                        <label>Datos SAR (Deformación)</label>
+                    </div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="enableNASA" checked>
+                        <label>NASA FIRMS (Temperatura)</label>
+                    </div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="enableMODVOLC">
+                        <label>MODVOLC (Puntos Calientes)</label>
+                    </div>
+                </div>
+                <button class="btn-primary" onclick="loadVolcanoData()">Cargar Volcanes</button>
+                <button class="btn-nasa" onclick="syncNASAData()">Sincronizar NASA</button>
+            </div>
+            
+            <div class="control-section">
+                <h3>📡 Análisis SAR</h3>
+                <div class="form-group">
+                    <label>Polarización</label>
+                    <select id="polarization">
+                        <option value="VV">VV - Detección Deformación</option>
+                        <option value="HH">HH - Análisis Superficie</option>
+                        <option value="VH">VH - Vegetación/Ceniza</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Período Análisis</label>
+                    <select id="timePeriod">
+                        <option value="7d">Últimos 7 días</option>
+                        <option value="30d">Últimos 30 días</option>
+                        <option value="90d">Últimos 3 meses</option>
+                    </select>
+                </div>
+                <button class="btn-secondary" onclick="analyzeDeformation()">Analizar Deformación</button>
+                <button class="btn-secondary" onclick="detectThermalChanges()">Cambios Térmicos</button>
+            </div>
+            
+            <div class="control-section">
+                <h3>🔥 Alertas NASA</h3>
+                <button class="btn-secondary" onclick="checkThermalAnomalies()">Anomalías Térmicas</button>
+                <button class="btn-secondary" onclick="checkSO2Levels()">Niveles SO₂</button>
+                <button class="btn-secondary" onclick="generateAlert()">Sistema de Alerta</button>
+                
+                <div id="volcanoResults" class="volcano-info" style="display: none;">
+                    <h4 style="color: #ff6b35; margin-bottom: 10px;">Estado Volcanes</h4>
+                    <div class="stats">
+                        <div class="stat-box">
+                            <div class="stat-value" id="activeVolcanoes">-</div>
+                            <div class="stat-label">Volcanes Activos</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-value" id="thermalAlerts">-</div>
+                            <div class="stat-label">Alertas Térmicas</div>
+                        </div>
+                    </div>
+                    <div id="volcanoList"></div>
+                </div>
+            </div>
+            
+            <div class="control-section">
+                <h3>📊 Exportar Análisis</h3>
+                <button class="btn-secondary" onclick="exportVolcanoMap()">Mapa Volcanes</button>
+                <button class="btn-secondary" onclick="generateVolcanoReport()">Reporte Actividad</button>
+                <button class="btn-secondary" onclick="shareWithINGEMMET()">Enviar a INGEMMET</button>
+            </div>
+        </div>
+        
+        <div class="map-container">
+            <div id="map"></div>
+            
+            <div class="alert-panel" id="alertPanel" style="display: none;">
+                <div class="alert-header">
+                    <h4>🚨 Alertas Activas</h4>
+                    <button onclick="toggleAlertPanel()" style="background: none; border: none; color: white; cursor: pointer;">✕</button>
+                </div>
+                <div id="alertList"></div>
+            </div>
+            
+            <div class="legend">
+                <h4>Leyenda Volcanes</h4>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #ff4444;"></div>
+                    <span>Riesgo Muy Alto</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #ffaa00;"></div>
+                    <span>Riesgo Alto</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #ffdd00;"></div>
+                    <span>Riesgo Medio</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #00ff00;"></div>
+                    <span>Alerta Térmica NASA</span>
+                </div>
+            </div>
+            
+            <div class="data-source-indicator">
+                <div>SAR: <span id="sarStatus" class="source-active">Activo</span></div>
+                <div>NASA: <span id="nasaStatus" class="source-active">Conectado</span></div>
+                <div>Actualizado: <span id="lastUpdate">Hace 2 min</span></div>
+            </div>
+            
+            <div class="loading" id="loadingOverlay">
+                <div class="spinner"></div>
+                <div>Procesando datos volcánicos...</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    <script>
+        let map;
+        let volcanoMarkers = [];
+        let thermalLayer, deformationLayer;
+        let alertsActive = false;
+        
+        // Base de datos de volcanes peruanos con sus características
+        const volcanoDatabase = [
+            {
+                name: "Ubinas",
+                coords: [-16.376, -70.902],
+                risk: "very-high",
+                elevation: 5672,
+                lastEruption: "2019",
+                status: "active",
+                sarAnomalies: true,
+                thermalActivity: true
+            },
+            {
+                name: "Sabancaya",
+                coords: [-15.783, -71.850],
+                risk: "very-high",
+                elevation: 5960,
+                lastEruption: "2023",
+                status: "active",
+                sarAnomalies: true,
+                thermalActivity: true
+            },
+            {
+                name: "Misti",
+                coords: [-16.294, -71.406],
+                risk: "very-high",
+                elevation: 5825,
+                lastEruption: "1985",
+                status: "dormant",
+                sarAnomalies: false,
+                thermalActivity: false
+            },
+            {
+                name: "Coropuna",
+                coords: [-15.52, -72.65],
+                risk: "high",
+                elevation: 6425,
+                lastEruption: "Unknown",
+                status: "dormant",
+                sarAnomalies: false,
+                thermalActivity: false
+            },
+            {
+                name: "Ampato",
+                coords: [-15.80, -71.53],
+                risk: "high",
+                elevation: 6288,
+                lastEruption: "Unknown",
+                status: "dormant",
+                sarAnomalies: false,
+                thermalActivity: false
+            },
+            {
+                name: "Ticsani",
+                coords: [-17.08, -70.60],
+                risk: "high",
+                elevation: 5408,
+                lastEruption: "Unknown",
+                status: "dormant",
+                sarAnomalies: false,
+                thermalActivity: true
+            },
+            {
+                name: "Casiri",
+                coords: [-17.47, -69.81],
+                risk: "medium",
+                elevation: 5650,
+                lastEruption: "Unknown",
+                status: "dormant",
+                sarAnomalies: false,
+                thermalActivity: false
+            },
+            {
+                name: "Tutupaca",
+                coords: [-17.02, -70.35],
+                risk: "medium",
+                elevation: 5815,
+                lastEruption: "1802",
+                status: "dormant",
+                sarAnomalies: true,
+                thermalActivity: false
+            },
+            {
+                name: "Sara Sara",
+                coords: [-15.33, -73.45],
+                risk: "medium",
+                elevation: 5505,
+                lastEruption: "Unknown",
+                status: "dormant",
+                sarAnomalies: false,
+                thermalActivity: false
+            }
+        ];
+        
+        // Inicializar mapa
+        function initMap() {
+            // Asegurar que el contenedor del mapa esté disponible
+            const mapContainer = document.getElementById('map');
+            if (!mapContainer) {
+                console.error('Contenedor del mapa no encontrado');
+                return;
+            }
+
+            try {
+                map = L.map('map').setView([-16.0, -71.5], 7); // Centro en zona volcánica sur de Perú
+                
+                // Definir las capas base
+                const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap contributors',
+                    maxZoom: 18
+                });
+                
+                const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                    attribution: '© Esri, Maxar, Earthstar Geographics, NASA',
+                    maxZoom: 18
+                });
+                
+                const topoLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
+                    attribution: '© Esri, NASA, NGA, USGS',
+                    maxZoom: 18
+                });
+                
+                // Agregar la capa satelital por defecto (mejor para volcanes)
+                satelliteLayer.addTo(map);
+                
+                // Control de capas
+                const baseLayers = {
+                    "🛰️ Vista Satelital": satelliteLayer,
+                    "🗺️ Mapa Estándar": osmLayer,
+                    "🏔️ Mapa Topográfico": topoLayer
+                };
+                
+                const overlayLayers = {
+                    "🌋 Marcadores Volcanes": L.layerGroup(),
+                    "🔥 Actividad Térmica": L.layerGroup(),
+                    "📡 Deformación SAR": L.layerGroup()
+                };
+                
+                L.control.layers(baseLayers, overlayLayers, {
+                    position: 'topleft',
+                    collapsed: false
+                }).addTo(map);
+                
+                // Agregar escala
+                L.control.scale({
+                    position: 'bottomleft',
+                    metric: true,
+                    imperial: false
+                }).addTo(map);
+                
+                // Cargar volcanes por defecto después de un pequeño delay
+                setTimeout(() => {
+                    loadVolcanoData();
+                }, 500);
+                
+                // Simular conexión NASA
+                simulateNASAConnection();
+                
+                console.log('Mapa inicializado correctamente con vista satelital');
+                showNotification('Mapa satelital cargado - Listo para monitoreo volcánico');
+                
+            } catch (error) {
+                console.error('Error inicializando el mapa:', error);
+                showNotification('Error al cargar el mapa. Reintentando...');
+                
+                // Reintentar después de un momento
+                setTimeout(initMap, 2000);
+            }
+        }
+        
+        function loadVolcanoData() {
+            if (!map) {
+                console.error('Mapa no está inicializado');
+                showNotification('Error: Mapa no disponible');
+                return;
+            }
+            
+            showLoading(true);
+            const riskFilter = document.getElementById('riskFilter').value;
+            
+            // Limpiar marcadores anteriores
+            volcanoMarkers.forEach(marker => {
+                try {
+                    map.removeLayer(marker);
+                } catch (e) {
+                    console.warn('Error removiendo marcador:', e);
+                }
+            });
+            volcanoMarkers = [];
+            
+            setTimeout(() => {
+                try {
+                    let filteredVolcanoes = volcanoDatabase;
+                    if (riskFilter !== 'all') {
+                        filteredVolcanoes = volcanoDatabase.filter(v => v.risk === riskFilter);
+                    }
+                    
+                    filteredVolcanoes.forEach(volcano => {
+                        addVolcanoMarker(volcano);
+                    });
+                    
+                    // Ajustar vista del mapa para mostrar todos los volcanes
+                    if (filteredVolcanoes.length > 0) {
+                        const group = new L.featureGroup(volcanoMarkers);
+                        map.fitBounds(group.getBounds().pad(0.1));
+                    }
+                    
+                    updateVolcanoStats();
+                    showLoading(false);
+                    showNotification(`${filteredVolcanoes.length} volcanes cargados exitosamente`);
+                    
+                } catch (error) {
+                    console.error('Error cargando volcanes:', error);
+                    showLoading(false);
+                    showNotification('Error cargando volcanes');
+                }
+            }, 1500);
+        }
+        
+        function addVolcanoMarker(volcano) {
+            let color, size;
+            switch(volcano.risk) {
+                case 'very-high':
+                    color = '#ff4444';
+                    size = 15;
+                    break;
+                case 'high':
+                    color = '#ffaa00';
+                    size = 12;
+                    break;
+                case 'medium':
+                    color = '#ffdd00';
+                    size = 10;
+                    break;
+            }
+            
+            // Crear marcador principal
+            const marker = L.circleMarker(volcano.coords, {
+                color: color,
+                fillColor: color,
+                fillOpacity: 0.8,
+                radius: size,
+                weight: 3
+            });
+            
+            // Agregar ring de actividad térmica si detectada
+            if (volcano.thermalActivity) {
+                L.circleMarker(volcano.coords, {
+                    color: '#00ff00',
+                    fillColor: 'transparent',
+                    radius: size + 8,
+                    weight: 2,
+                    dashArray: '5, 5'
+                }).addTo(map);
+            }
+            
+            // Popup con información detallada
+            const popupContent = `
+                <div style="color: black; font-family: Arial;">
+                    <h3 style="color: ${color}; margin: 0 0 10px 0;">${volcano.name}</h3>
+                    <p><strong>Elevación:</strong> ${volcano.elevation}m</p>
+                    <p><strong>Última erupción:</strong> ${volcano.lastEruption}</p>
+                    <p><strong>Estado:</strong> ${volcano.status === 'active' ? '🔴 Activo' : '🟡 Dormido'}</p>
+                    <p><strong>Deformación SAR:</strong> ${volcano.sarAnomalies ? '⚠️ Detectada' : '✅ Normal'}</p>
+                    <p><strong>Actividad térmica:</strong> ${volcano.thermalActivity ? '🔥 Detectada' : '❄️ Normal'}</p>
+                    <div style="margin-top: 10px;">
+                        <button onclick="focusVolcano('${volcano.name}')" style="background: ${color}; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer;">
+                            Analizar Detalle
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            marker.bindPopup(popupContent);
+            marker.addTo(map);
+            volcanoMarkers.push(marker);
+        }
+        
+        function syncNASAData() {
+            showLoading(true);
+            
+            // Simular llamada a NASA FIRMS API
+            setTimeout(() => {
+                // Simular detección de nuevas anomalías térmicas
+                const thermalAnomalies = [
+                    { volcano: "Ubinas", intensity: 85, confidence: 92 },
+                    { volcano: "Sabancaya", intensity: 72, confidence: 88 },
+                    { volcano: "Ticsani", intensity: 45, confidence: 67 }
+                ];
+                
+                // Actualizar marcadores con datos NASA
+                thermalAnomalies.forEach(anomaly => {
+                    const volcano = volcanoDatabase.find(v => v.name === anomaly.volcano);
+                    if (volcano) {
+                        volcano.thermalActivity = true;
+                        volcano.nasaIntensity = anomaly.intensity;
+                        volcano.confidence = anomaly.confidence;
+                    }
+                });
+                
+                // Recargar volcanes con nuevos datos
+                loadVolcanoData();
+                
+                // Generar alertas si es necesario
+                if (thermalAnomalies.some(a => a.intensity > 70)) {
+                    generateAutoAlert();
+                }
+                
+                showLoading(false);
+                showNotification('Sincronización NASA completada');
+                document.getElementById('lastUpdate').textContent = 'Ahora';
+            }, 2000);
+        }
+        
+        function analyzeDeformation() {
+            showLoading(true);
+            
+            setTimeout(() => {
+                // Simular análisis SAR de deformación
+                const deformationResults = [
+                    { volcano: "Ubinas", displacement: 2.3, direction: "uplift" },
+                    { volcano: "Tutupaca", displacement: 1.1, direction: "subsidence" },
+                    { volcano: "Sabancaya", displacement: 0.8, direction: "uplift" }
+                ];
+                
+                // Agregar overlay de deformación
+                if (deformationLayer) map.removeLayer(deformationLayer);
+                
+                deformationResults.forEach(result => {
+                    const volcano = volcanoDatabase.find(v => v.name === result.volcano);
+                    if (volcano) {
+                        const color = result.direction === 'uplift' ? '#ff6b35' : '#00d4ff';
+                        L.circle(volcano.coords, {
+                            color: color,
+                            fillColor: color,
+                            fillOpacity: 0.3,
+                            radius: result.displacement * 2000 // Escalar para visualización
+                        }).addTo(map).bindPopup(`
+                            <div style="color: black;">
+                                <h4>${result.volcano}</h4>
+                                <p>Desplazamiento: ${result.displacement} cm</p>
+                                <p>Dirección: ${result.direction}</p>
+                            </div>
+                        `);
+                    }
+                });
+                
+                showLoading(false);
+                showNotification('Análisis de deformación completado');
+            }, 1800);
+        }
+        
+        function detectThermalChanges() {
+            showLoading(true);
+            
+            setTimeout(() => {
+                // Simular detección de cambios térmicos
+                const activeVolcanoes = volcanoDatabase.filter(v => v.thermalActivity);
+                
+                activeVolcanoes.forEach(volcano => {
+                    // Agregar heatmap simulado
+                    L.circle(volcano.coords, {
+                        color: '#ff0000',
+                        fillColor: '#ff6600',
+                        fillOpacity: 0.4,
+                        radius: 3000
+                    }).addTo(map).bindPopup(`
+                        <div style="color: black;">
+                            <h4>🔥 ${volcano.name}</h4>
+                            <p>Anomalía térmica detectada</p>
+                            <p>Intensidad: ${volcano.nasaIntensity || Math.floor(Math.random() * 50 + 30)}%</p>
+                            <p>Fuente: NASA FIRMS</p>
+                        </div>
+                    `);
+                });
+                
+                showLoading(false);
+                showNotification(`${activeVolcanoes.length} anomalías térmicas detectadas`);
+            }, 1200);
+        }
+        
+        function checkThermalAnomalies() {
+            // Simular consulta FIRMS API
+            showNotification('Consultando NASA FIRMS...');
+            syncNASAData();
+        }
+        
+        function checkSO2Levels() {
+            showLoading(true);
+            
+            setTimeout(() => {
+                // Simular datos de SO2 de OMI/TROPOMI
+                const so2Data = [
+                    { volcano: "Ubinas", so2Level: 145, status: "elevated" },
+                    { volcano: "Sabancaya", so2Level: 89, status: "normal" },
+                    { volcano: "Misti", so2Level: 23, status: "normal" }
+                ];
+                
+                so2Data.forEach(data => {
+                    const volcano = volcanoDatabase.find(v => v.name === data.volcano);
+                    if (volcano && data.so2Level > 100) {
+                        // Agregar overlay de SO2
+                        L.circle(volcano.coords, {
+                            color: '#9400d3',
+                            fillColor: '#ba55d3',
+                            fillOpacity: 0.5,
+                            radius: data.so2Level * 50
+                        }).addTo(map).bindPopup(`
+                            <div style="color: black;">
+                                <h4>☁️ ${data.volcano}</h4>
+                                <p>SO₂: ${data.so2Level} DU</p>
+                                <p>Estado: ${data.status === 'elevated' ? '⚠️ Elevado' : '✅ Normal'}</p>
+                                <p>Fuente: NASA OMI</p>
+                            </div>
+                        `);
+                    }
+                });
+                
+                showLoading(false);
+                showNotification('Análisis SO₂ completado');
+            }, 1500);
+        }
+        
+        function generateAlert() {
+            const activeVolcanoes = volcanoDatabase.filter(v => v.status === 'active' || v.thermalActivity);
+            
+            if (activeVolcanoes.length > 0) {
+                showAlertPanel(activeVolcanoes);
+                showNotification(`${activeVolcanoes.length} alertas generadas`);
+            } else {
+                showNotification('No hay alertas activas');
+            }
+        }
+        
+        function generateAutoAlert() {
+            const highRiskVolcanoes = volcanoDatabase.filter(v => 
+                (v.thermalActivity && v.nasaIntensity > 70) || 
+                (v.sarAnomalies && v.risk === 'very-high')
+            );
+            
+            if (highRiskVolcanoes.length > 0) {
+                showAlertPanel(highRiskVolcanoes);
+            }
+        }
+        
+        function showAlertPanel(volcanoes) {
+            const alertPanel = document.getElementById('alertPanel');
+            const alertList = document.getElementById('alertList');
+            
+            alertList.innerHTML = '';
+            
+            volcanoes.forEach(volcano => {
+                const alertLevel = volcano.risk === 'very-high' && volcano.thermalActivity ? 'high' : 
+                                 volcano.thermalActivity ? 'medium' : 'info';
+                
+                const alertDiv = document.createElement('div');
+                alertDiv.className = `alert-item alert-${alertLevel}`;
+                alertDiv.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: start;">
+                        <div>
+                            <strong>${volcano.name}</strong>
+                            <div style="font-size: 0.9rem; color: #ccc; margin-top: 4px;">
+                                ${volcano.thermalActivity ? '🔥 Actividad térmica' : ''}
+                                ${volcano.sarAnomalies ? ' 📡 Deformación SAR' : ''}
+                            </div>
+                            <div style="font-size: 0.8rem; color: #aaa; margin-top: 4px;">
+                                ${formatTimeAgo(Math.random() * 60)} min
+                            </div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div class="risk-badge risk-${volcano.risk}">
+                                ${volcano.risk.toUpperCase().replace('-', ' ')}
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                alertDiv.onclick = () => focusVolcano(volcano.name);
+                alertList.appendChild(alertDiv);
+            });
+            
+            alertPanel.style.display = 'block';
+            alertsActive = true;
+        }
+        
+        function toggleAlertPanel() {
+            const alertPanel = document.getElementById('alertPanel');
+            alertPanel.style.display = alertsActive ? 'none' : 'block';
+            alertsActive = !alertsActive;
+        }
+        
+        function focusVolcano(volcanoName) {
+            const volcano = volcanoDatabase.find(v => v.name === volcanoName);
+            if (volcano) {
+                map.setView(volcano.coords, 12);
+                
+                // Mostrar información detallada en sidebar
+                showVolcanoDetail(volcano);
+                
+                // Agregar círculo de enfoque temporal
+                const focusCircle = L.circle(volcano.coords, {
+                    color: '#00ff00',
+                    fillColor: 'transparent',
+                    radius: 5000,
+                    weight: 3,
+                    dashArray: '10, 10'
+                }).addTo(map);
+                
+                setTimeout(() => map.removeLayer(focusCircle), 3000);
+            }
+        }
+        
+        function showVolcanoDetail(volcano) {
+            const resultsDiv = document.getElementById('volcanoResults');
+            const volcanoList = document.getElementById('volcanoList');
+            
+            volcanoList.innerHTML = `
+                <div class="volcano-card">
+                    <h4>${volcano.name}</h4>
+                    <p><strong>Coordenadas:</strong> ${volcano.coords[0].toFixed(3)}, ${volcano.coords[1].toFixed(3)}</p>
+                    <p><strong>Elevación:</strong> ${volcano.elevation}m</p>
+                    <p><strong>Última erupción:</strong> ${volcano.lastEruption}</p>
+                    <p><strong>Estado actual:</strong> ${volcano.status === 'active' ? '🔴 Activo' : '🟡 Dormido'}</p>
+                    
+                    <div style="margin-top: 15px;">
+                        <h5 style="color: #00d4ff; margin-bottom: 8px;">Análisis Integrado SAR + NASA:</h5>
+                        <ul style="margin: 0; padding-left: 20px; font-size: 0.9rem;">
+                            <li>Deformación SAR: ${volcano.sarAnomalies ? '⚠️ Detectada' : '✅ Normal'}</li>
+                            <li>Actividad térmica NASA: ${volcano.thermalActivity ? '🔥 Detectada' : '❄️ Normal'}</li>
+                            ${volcano.nasaIntensity ? `<li>Intensidad térmica: ${volcano.nasaIntensity}%</li>` : ''}
+                            ${volcano.confidence ? `<li>Confianza NASA: ${volcano.confidence}%</li>` : ''}
+                        </ul>
+                    </div>
+                    
+                    <div class="risk-badge risk-${volcano.risk}">
+                        RIESGO ${volcano.risk.toUpperCase().replace('-', ' ')}
+                    </div>
+                </div>
+            `;
+            
+            resultsDiv.style.display = 'block';
+        }
+        
+        function updateVolcanoStats() {
+            const activeCount = volcanoDatabase.filter(v => v.status === 'active' || v.thermalActivity).length;
+            const thermalCount = volcanoDatabase.filter(v => v.thermalActivity).length;
+            
+            document.getElementById('activeVolcanoes').textContent = activeCount;
+            document.getElementById('thermalAlerts').textContent = thermalCount;
+            document.getElementById('volcanoResults').style.display = 'block';
+        }
+        
+        function simulateNASAConnection() {
+            // Simular actualizaciones periódicas de NASA
+            setInterval(() => {
+                const now = new Date();
+                document.getElementById('lastUpdate').textContent = 
+                    `${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+            }, 60000);
+            
+            // Simular reconexión ocasional
+            setInterval(() => {
+                const nasaStatus = document.getElementById('nasaStatus');
+                nasaStatus.className = 'source-inactive';
+                nasaStatus.textContent = 'Reconectando...';
+                
+                setTimeout(() => {
+                    nasaStatus.className = 'source-active';
+                    nasaStatus.textContent = 'Conectado';
+                }, 2000);
+            }, 300000); // cada 5 minutos
+        }
+        
+        // Funciones de exportación
+        function exportVolcanoMap() {
+            showLoading(true);
+            setTimeout(() => {
+                showLoading(false);
+                showNotification('Mapa volcánico exportado como PNG');
+            }, 1500);
+        }
+        
+        function generateVolcanoReport() {
+            showLoading(true);
+            
+            setTimeout(() => {
+                // Simular generación de reporte PDF
+                const activeVolcanoes = volcanoDatabase.filter(v => v.thermalActivity || v.sarAnomalies).length;
+                const highRisk = volcanoDatabase.filter(v => v.risk === 'very-high').length;
+                
+                showLoading(false);
+                showNotification(`Reporte generado: ${activeVolcanoes} volcanes con actividad, ${highRisk} de alto riesgo`);
+            }, 2000);
+        }
+        
+        function shareWithINGEMMET() {
+            showLoading(true);
+            
+            setTimeout(() => {
+                showLoading(false);
+                showNotification('Datos enviados a INGEMMET - Instituto Geológico del Perú');
+            }, 1800);
+        }
+        
+        // Funciones utilitarias
+        function showLoading(show) {
+            document.getElementById('loadingOverlay').style.display = show ? 'block' : 'none';
+        }
+        
+        function showNotification(message) {
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: linear-gradient(45deg, #ff6b35, #ff8c42);
+                color: white;
+                padding: 15px 20px;
+                border-radius: 8px;
+                z-index: 10000;
+                animation: slideInRight 0.3s ease;
+                max-width: 300px;
+                box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            `;
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.animation = 'slideOutRight 0.3s ease';
+                setTimeout(() => notification.remove(), 300);
+            }, 4000);
+        }
+        
+        function formatTimeAgo(minutes) {
+            return Math.floor(minutes);
+        }
+        
+        // CSS para animaciones
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes slideInRight {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+            @keyframes slideOutRight {
+                from { transform: translateX(0); opacity: 1; }
+                to { transform: translateX(100%); opacity: 0; }
+            }
+            
+            .volcano-marker-pulse {
+                animation: volcano-pulse 2s infinite;
+            }
+            
+            @keyframes volcano-pulse {
+                0% { opacity: 1; transform: scale(1); }
+                50% { opacity: 0.7; transform: scale(1.1); }
+                100% { opacity: 1; transform: scale(1); }
+            }
+        `;
+        document.head.appendChild(style);
+        
+        // Event listeners
+        document.getElementById('riskFilter').addEventListener('change', loadVolcanoData);
+        
+        document.getElementById('enableSAR').addEventListener('change', function() {
+            const sarStatus = document.getElementById('sarStatus');
+            sarStatus.className = this.checked ? 'source-active' : 'source-inactive';
+            sarStatus.textContent = this.checked ? 'Activo' : 'Inactivo';
+        });
+        
+        document.getElementById('enableNASA').addEventListener('change', function() {
+            const nasaStatus = document.getElementById('nasaStatus');
+            nasaStatus.className = this.checked ? 'source-active' : 'source-inactive';
+            nasaStatus.textContent = this.checked ? 'Conectado' : 'Desconectado';
+        });
+        
+        // Inicializar aplicación con verificación de dependencias
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM cargado, inicializando aplicación...');
+            
+            // Verificar que Leaflet esté cargado
+            if (typeof L === 'undefined') {
+                console.error('Leaflet no está cargado');
+                showNotification('Error: Biblioteca de mapas no disponible');
+                return;
+            }
+            
+            // Verificar que el contenedor del mapa exista
+            const mapContainer = document.getElementById('map');
+            if (!mapContainer) {
+                console.error('Contenedor del mapa no encontrado');
+                return;
+            }
+            
+            // Establecer dimensiones del mapa explícitamente
+            mapContainer.style.height = '100%';
+            mapContainer.style.width = '100%';
+            
+            // Inicializar mapa con delay para asegurar que todo esté listo
+            setTimeout(() => {
+                initMap();
+            }, 100);
+            
+            console.log('Aplicación inicializada');
+        });
+        
+        // Simular actualizaciones automáticas cada 5 minutos
+        setInterval(() => {
+            if (document.getElementById('enableNASA').checked) {
+                // Actualización silenciosa de datos NASA
+                const randomVolcano = volcanoDatabase[Math.floor(Math.random() * volcanoDatabase.length)];
+                if (Math.random() > 0.7) { // 30% probabilidad de nueva actividad
+                    randomVolcano.thermalActivity = true;
+                    randomVolcano.nasaIntensity = Math.floor(Math.random() * 40 + 40);
+                    
+                    if (randomVolcano.nasaIntensity > 70) {
+                        showNotification(`🔥 Nueva actividad térmica detectada en ${randomVolcano.name}`);
+                        generateAutoAlert();
+                    }
+                }
+            }
+        }, 300000); // 5 minutos
+    </script>
+</body>
+</html>
